@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, integer, pgEnum, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, timestamp, integer, pgEnum, boolean, unique } from 'drizzle-orm/pg-core';
 
 export const roleEnum = pgEnum('role', ['ADMIN', 'LAWYER', 'CLIENT', 'CLERK']);
 export const statusEnum = pgEnum('status', ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'DELAYED']);
@@ -35,14 +35,16 @@ export const hearings = pgTable('hearings', {
 });
 
 // Statutory Master Table (For Law/Act references)
-export const statutoryMaster = pgTable('statutory_master', {
-  id: serial('id').primaryKey(),
-  actName: text('act_name').notNull(), // e.g., "Indian Penal Code"
-  section: text('section').notNull(), // e.g., "Section 302"
-  description: text('description'),
-  penalty: text('penalty'),
-  createdAt: timestamp('created_at').defaultNow(),
-});
+export const statutoryMaster = pgTable("statutory_master", {
+  id: serial("id").primaryKey(),
+  actName: text("act_name").notNull(),
+  section: text("section").notNull(),
+  description: text("description"),
+  penalty: text("penalty"),
+}, (t) => ({
+  // This prevents the AI from adding the same law twice
+  unq: unique().on(t.actName, t.section),
+}));
 
 // Client Inquiries Table
 export const inquiries = pgTable('inquiries', {

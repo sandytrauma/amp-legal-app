@@ -3,30 +3,47 @@
 @tailwind utilities;
 
 :root {
-  --neon-yellow: #CCFF00;
-  --electric-blue: #0033FF;
-  --deep-space: #050508;
+  --neon-yellow: #D4FF00;
+  --vibrant-pink: #FF00D4;
 }
 
 body {
-  background-color: var(--deep-space);
+  background-color: #020203;
   color: white;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Custom Glow Utilities */
-.glow-yellow {
-  box-shadow: 0 0 15px rgba(204, 255, 0, 0.4);
+/* AMP OS CUSTOM ANIMATIONS */
+@layer utilities {
+  .animate-shimmer {
+    animation: shimmer 2s infinite linear;
+  }
+
+  .glow-yellow {
+    text-shadow: 0 0 10px rgba(212, 255, 0, 0.4);
+  }
+
+  .glow-border-yellow {
+    box-shadow: 0 0 15px rgba(212, 255, 0, 0.15);
+  }
 }
 
-.glow-text-blue {
-  text-shadow: 0 0 10px rgba(0, 51, 255, 0.8);
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
 }
 
-/* Bordio-style scrollbars */
+/* CUSTOM SCROLLBAR - Minimalist */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--electric-blue);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--neon-yellow);
 }

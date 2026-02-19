@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { tasks, inquiries, users, notifications } from "@/db/schema";
 import { sql, desc, gte, isNotNull, eq, and } from "drizzle-orm";
-import { Gavel, MessageSquare, Clock, ArrowUpRight, Calendar, User, Activity } from "lucide-react";
+import { Gavel, MessageSquare, Clock, ArrowUpRight, Calendar, User, Activity, Zap } from "lucide-react";
 import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -17,16 +17,11 @@ export default async function DashboardPage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // 1. Unified Counts
+  // 1. Data Fetching
   const [taskCount] = await db.select({ count: sql<number>`count(*)` }).from(tasks);
   const [inquiryCount] = await db.select({ count: sql<number>`count(*)` }).from(inquiries);
-  
-  const [upcomingHearingCount] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(tasks)
-    .where(gte(tasks.deadline, today));
+  const [upcomingHearingCount] = await db.select({ count: sql<number>`count(*)` }).from(tasks).where(gte(tasks.deadline, today));
 
-  // 2. Fetch Recent Tasks with Hearing Dates & Assigned Counsel
   const upcomingDocket = await db
     .select({
       id: tasks.id,
@@ -40,138 +35,150 @@ export default async function DashboardPage() {
     .orderBy(desc(tasks.deadline))
     .limit(8);
 
-  // 3. Fetch Recent Unread Notifications for the logged-in user
   const userId = parseInt(session.user.id, 10);
   const recentAlerts = await db
     .select()
     .from(notifications)
-    .where(
-      and(
-        eq(notifications.userId, isNaN(userId) ? 0 : userId),
-        eq(notifications.isRead, false)
-      )
-    )
+    .where(and(eq(notifications.userId, isNaN(userId) ? 0 : userId), eq(notifications.isRead, false)))
     .orderBy(desc(notifications.createdAt))
     .limit(3);
 
   return (
-    <div className="min-h-screen bg-[#020203] text-white md:p-12">
-      <div className="max-w-[1400px] mx-auto space-y-8">
+    <div className="min-h-screen bg-[#020203] text-white p-6 md:p-12">
+      <div className="max-w-[1600px] mx-auto space-y-12">
         
         {/* --- HEADER --- */}
-        <header className="flex flex-col md:flex-row justify-between items-end border-b border-white/10 pb-8 gap-4">
-          <div className="space-y-1">
-            <h1 className="text-3xl font-black uppercase italic tracking-tighter">
-              AMP <span className="text-neon-yellow">COMMAND</span>
-            </h1>
-            <p className="text-[10px] font-mono text-gray-600 uppercase tracking-[0.4em]">Sector 44 // Gurugram Hub</p>
+        <header className="flex flex-col md:flex-row justify-between items-end md:items-end border-b border-white/5 pb-10 gap-6">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-[2px] h-8 bg-neon-yellow shadow-[0_0_15px_#D4FF00]" />
+              <h1 className="text-4xl font-black uppercase italic tracking-tighter">
+                AMP <span className="text-neon-yellow text-glow-yellow">COMMAND</span>
+              </h1>
+            </div>
+            <p className="text-[9px] font-mono text-gray-700 uppercase tracking-[0.6em] ml-4">
+              Sector 44 // Gurugram Central // {today.toLocaleDateString('en-IN', { weekday: 'long' })}
+            </p>
           </div>
-          <Link href="/staff" className="flex items-center gap-2 text-[10px] font-bold text-gray-500 hover:text-neon-yellow transition-colors uppercase tracking-widest bg-white/5 px-4 py-2 rounded">
-            <User size={12} /> {session.user.role} // SYSTEM ACCESS
-          </Link>
+          <div className="flex items-center gap-4 bg-white/[0.03] border border-white/5 p-4 rounded-sm backdrop-blur-md">
+            <div className="text-right">
+              <p className="text-[8px] font-mono text-gray-500 uppercase tracking-widest">Operator_Auth</p>
+              <p className="text-[10px] font-black text-white uppercase italic">{session.user.name} // {session.user.role}</p>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-neon-yellow/10 flex items-center justify-center border border-neon-yellow/20">
+              <Zap size={14} className="text-neon-yellow" />
+            </div>
+          </div>
         </header>
 
-        {/* --- KEY PERFORMANCE TILES --- */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-white/10 border border-white/10 overflow-hidden py-2 rounded-sm">
-          <StatTile label="Hearings Scheduled" value={upcomingHearingCount.count} icon={<Gavel size={16}/>} />
-          <StatTile label="Active Protocols" value={taskCount.count} icon={<Clock size={16}/>} />
-          <StatTile label="Client Inquiries" value={inquiryCount.count} icon={<MessageSquare size={16}/>} />
+        {/* --- KPI TILES: VERTICAL BLADE STYLE --- */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <StatTile label="Hearings Scheduled" value={upcomingHearingCount.count} icon={<Gavel size={18}/>} />
+          <StatTile label="Active Protocols" value={taskCount.count} icon={<Clock size={18}/>} />
+          <StatTile label="Client Inquiries" value={inquiryCount.count} icon={<MessageSquare size={18}/>} />
         </div>
 
         {/* --- DATA BOARD --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 py-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-4">
           
-          {/* Upcoming Docket (3 Columns) */}
-          <div className="lg:col-span-3 space-y-6">
-            <div className="flex justify-between items-center border-b border-white/5 pb-4">
-              <h2 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2">
-                <Calendar size={14} className="text-neon-yellow" /> Upcoming Docket
+          {/* Upcoming Docket (Left 8 Columns) */}
+          <div className="lg:col-span-8 space-y-6 bg-white/[0.01] border border-white/5 p-8 rounded-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5">
+               <Calendar size={120} />
+            </div>
+            
+            <div className="flex justify-between items-center mb-10 relative z-10">
+              <h2 className="text-[11px] font-black uppercase tracking-[0.4em] text-gray-500 flex items-center gap-3">
+                <span className="w-4 h-[1px] bg-neon-yellow" /> LIVE_DOCKET_FEED
               </h2>
-              <Link href="/tasks" className="text-[10px] bg-white text-black px-3 py-1 font-black uppercase italic hover:bg-neon-yellow transition-colors">
-                View Full Board
+              <Link href="/tasks" className="text-[9px] font-black text-neon-yellow border border-neon-yellow/30 px-4 py-2 hover:bg-neon-yellow hover:text-black transition-all uppercase italic">
+                Access Full Board
               </Link>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1 relative z-10">
               {upcomingDocket.length > 0 ? upcomingDocket.map((task) => (
-                <div key={task.id} className="flex items-center justify-between p-4 bg-white/[0.02] hover:bg-white/[0.05] transition-all border border-transparent hover:border-white/10 group">
-                  <div className="flex items-center gap-6">
-                    <span className="text-[10px] font-mono text-gray-600 w-12">
+                <div key={task.id} className="flex items-center justify-between p-5 bg-white/[0.01] hover:bg-white/[0.04] transition-all border-b border-white/[0.03] group relative">
+                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-0 bg-neon-yellow group-hover:h-3/4 transition-all duration-300" />
+                  
+                  <div className="flex items-center gap-8">
+                    <span className="text-[11px] font-mono text-gray-700 w-16 group-hover:text-white transition-colors">
                       {task.deadline ? new Date(task.deadline).toLocaleDateString('en-IN', {day: '2-digit', month: 'short'}) : "---"}
                     </span>
                     <div className="flex flex-col">
-                      <span className="text-sm font-bold uppercase tracking-tight group-hover:text-neon-yellow transition-colors">
+                      <span className="text-sm font-bold uppercase tracking-tight text-white group-hover:text-neon-yellow transition-colors">
                         {task.title}
                       </span>
-                      <span className="text-[9px] text-electric-blue font-bold uppercase italic opacity-60">
-                        Counsel: {task.assigneeName || "Unassigned"}
+                      <span className="text-[9px] text-electric-blue font-bold uppercase italic mt-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                        Assigned Counsel: {task.assigneeName || "AWAITING_ALLOCATION"}
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-8">
-                    <Link href={`/tasks`}>
-                      <ArrowUpRight size={14} className="text-gray-800 group-hover:text-white transition-colors" />
-                    </Link>
-                  </div>
+                  <ArrowUpRight size={14} className="text-gray-800 group-hover:text-neon-yellow transition-all transform group-hover:-translate-y-1" />
                 </div>
               )) : (
-                <p className="text-gray-800 font-mono text-[10px] py-10 text-center uppercase tracking-widest">No upcoming hearings found in system.</p>
+                <div className="py-20 text-center border border-dashed border-white/5">
+                   <p className="text-gray-800 font-mono text-[10px] uppercase tracking-[0.5em] italic">Zero active protocol streams detected.</p>
+                </div>
               )}
             </div>
           </div>
 
-          {/* Efficiency & System Feed (1 Column) */}
-          <div className="space-y-6">
+          {/* Efficiency & System Feed (Right 4 Columns) */}
+          <div className="lg:col-span-4 space-y-6">
             
             {/* SYSTEM ALERTS FEED */}
-            <div className="bg-[#0A0A0F] border border-white/5 p-5 rounded-sm">
-              <div className="flex justify-between items-center mb-6">
-                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">System Feed</p>
-                <div className="flex gap-1">
-                  <div className="w-1 h-1 bg-vibrant-pink animate-pulse"></div>
-                  <div className="w-1 h-1 bg-vibrant-pink animate-pulse delay-75"></div>
+            <div className="bg-[#0A0A0F] border border-white/5 p-8 rounded-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-vibrant-pink/5 blur-3xl rounded-full" />
+              <div className="flex justify-between items-center mb-8 relative z-10">
+                <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">System_Log</p>
+                <div className="flex gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-vibrant-pink animate-pulse" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-vibrant-pink/20" />
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-5 relative z-10">
                 {recentAlerts.length > 0 ? recentAlerts.map((alert) => (
-                  <div key={alert.id} className="border-l-2 border-vibrant-pink pl-3 py-1">
-                    <p className="text-[10px] font-bold text-white uppercase leading-tight truncate">
+                  <div key={alert.id} className="border-l border-white/10 pl-4 py-1 hover:border-vibrant-pink transition-colors">
+                    <p className="text-[10px] font-bold text-white uppercase leading-relaxed">
                       {alert.message}
                     </p>
-                    <p className="text-[8px] font-mono text-gray-700 mt-1 uppercase italic">
-                      {new Date(alert.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} // {alert.type}
-                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                       <span className="text-[7px] font-mono text-vibrant-pink uppercase px-1.5 py-0.5 bg-vibrant-pink/10">{alert.type}</span>
+                       <span className="text-[7px] font-mono text-gray-700 uppercase italic">
+                         {new Date(alert.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                       </span>
+                    </div>
                   </div>
                 )) : (
-                  <p className="text-[9px] font-mono text-gray-800 uppercase italic">No pending alerts.</p>
+                  <p className="text-[9px] font-mono text-gray-800 uppercase italic">No pending uplink alerts.</p>
                 )}
               </div>
               
-              <Link href="/notifications" className="block mt-6 text-center py-2 border border-white/5 text-[8px] font-black text-gray-600 hover:text-white hover:bg-white/5 transition-all uppercase tracking-widest">
-                Open Full Comms
+              <Link href="/notifications" className="block mt-10 text-center py-3 border border-white/5 text-[9px] font-black text-gray-600 hover:text-white hover:bg-white/5 transition-all uppercase tracking-[0.3em] italic">
+                Sync Communication Hub
               </Link>
             </div>
 
-            {/* EXECUTION RATE */}
-            <div className="bg-[#0A0A0F] border border-white/5 p-6 rounded-sm">
-              <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-6">Execution Rate</p>
-              <div className="relative pt-1">
-                <div className="flex mb-2 items-center justify-between">
-                  <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-neon-yellow bg-neon-yellow/10">
-                    Task Success
-                  </span>
-                  <span className="text-xs font-bold inline-block text-white">94%</span>
-                </div>
-                <div className="overflow-hidden h-1 mb-4 text-xs flex rounded bg-white/5">
-                  <div style={{ width: "94%" }} className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-neon-yellow"></div>
-                </div>
+            {/* PERFORMANCE METRIC */}
+            <div className="bg-white/[0.01] border border-white/5 p-8 rounded-sm overflow-hidden relative group">
+              <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-8">System_Efficiency</p>
+              <div className="flex items-end justify-between mb-4">
+                 <h4 className="text-4xl font-black italic tracking-tighter text-white">94<span className="text-neon-yellow font-mono text-xl">%</span></h4>
+                 <Activity size={20} className="text-neon-yellow/30 group-hover:text-neon-yellow transition-colors" />
               </div>
+              <div className="h-[2px] w-full bg-white/5 relative overflow-hidden">
+                 <div className="absolute inset-0 bg-neon-yellow shadow-[0_0_10px_#D4FF00] w-[94%] transition-all duration-1000" />
+                 <div className="absolute inset-0 bg-white/20 w-1/2 animate-shimmer" />
+              </div>
+              <p className="text-[8px] font-mono text-gray-800 uppercase mt-4 tracking-widest">Protocol Execution Rate // Global</p>
             </div>
             
-            <div className="p-6 border border-dashed border-white/10 opacity-30 flex flex-col items-center justify-center text-center py-8">
-              <p className="text-[9px] font-mono text-gray-600 uppercase">Docket Security</p>
-              <p className="text-[10px] font-black text-white mt-2 italic">ENCRYPTED SESSION ACTIVE</p>
+            <div className="p-8 border border-dashed border-white/5 opacity-40 flex flex-col items-center justify-center text-center">
+              <div className="w-1.5 h-1.5 rounded-full bg-neon-yellow animate-ping mb-4" />
+              <p className="text-[8px] font-mono text-gray-600 uppercase tracking-[0.4em]">Node_Sec_Protocol</p>
+              <p className="text-[9px] font-black text-white mt-2 italic uppercase">End-to-End Encrypted</p>
             </div>
           </div>
 
@@ -183,14 +190,22 @@ export default async function DashboardPage() {
 
 function StatTile({ label, value, icon }: { label: string, value: number, icon: any }) {
   return (
-    <div className="bg-[#050508] p-10 hover:bg-white/[0.02] transition-colors group">
-      <div className="flex items-center gap-3 text-gray-500 mb-4">
+    <div className="relative bg-white/[0.02] border border-white/5 p-10 hover:bg-white/[0.04] transition-all group overflow-hidden">
+      {/* The Vertical Blade (Matches Sidebar) */}
+      <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-neon-yellow shadow-[0_0_15px_#D4FF00] opacity-0 group-hover:opacity-100 transition-all duration-500" />
+      
+      <div className="flex items-center gap-3 text-gray-600 mb-6 group-hover:text-white transition-colors">
         {icon}
-        <p className="text-[10px] font-black uppercase tracking-[0.2em]">{label}</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.3em]">{label}</p>
       </div>
-      <p className="text-6xl font-black italic tracking-tighter group-hover:text-neon-yellow transition-colors">
+      <p className="text-7xl font-black italic tracking-tighter text-white group-hover:text-neon-yellow group-hover:glow-yellow transition-all duration-500 leading-none">
         {value.toString().padStart(2, '0')}
       </p>
+      
+      {/* Subtle Background Mark */}
+      <div className="absolute bottom-0 right-0 p-4 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity">
+         <Zap size={80} />
+      </div>
     </div>
   );
 }

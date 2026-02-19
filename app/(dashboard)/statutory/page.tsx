@@ -1,81 +1,103 @@
 import { db } from "@/db";
 import { statutoryMaster } from "@/db/schema";
 import { ilike, or } from "drizzle-orm";
-import { Search, Gavel, Scale, AlertTriangle } from "lucide-react";
+import { Scale, AlertTriangle, Cpu } from "lucide-react";
+import SearchTerminal from "./search-terminal";
+
+// CRITICAL: Prevent caching of search results
+export const dynamic = "force-dynamic";
 
 export default async function StatutoryPage({
   searchParams,
 }: {
-  searchParams: { q?: string };
+  searchParams: Promise<{ q?: string }>;
 }) {
-  const query = searchParams.q || "";
+  const resolvedParams = await searchParams;
+  const query = resolvedParams.q || "";
 
-  // Fetching data based on search
+  // Standard Drizzle Query
   const records = await db
-    .select()
-    .from(statutoryMaster)
-    .where(
-      or(
-        ilike(statutoryMaster.actName, `%${query}%`),
-        ilike(statutoryMaster.section, `%${query}%`)
-      )
-    )
-    .limit(20);
+  .select()
+  .from(statutoryMaster)
+  .where(
+    query 
+      ? or(
+          ilike(statutoryMaster.actName, `%${query}%`),
+          ilike(statutoryMaster.section, `%${query}%`),
+          ilike(statutoryMaster.description, `%${query}%`) // Added description search
+        )
+      : undefined
+  )
+  .orderBy(statutoryMaster.id);
 
   return (
-    <div className="space-y-8">
-      <section>
-        <h1 className="text-5xl font-black italic uppercase tracking-tighter text-white">
-          Statutory <span className="text-neon-yellow">Master</span>
-        </h1>
-        <p className="text-gray-500 font-mono text-xs mt-1">AMP LEGAL // REFERENCE DATABASE</p>
-      </section>
+    <div className="min-h-screen bg-[#020203] text-white p-6 md:p-12 space-y-12">
+      
+      {/* HEADER */}
+      <header className="flex flex-col md:flex-row justify-between items-end md:items-end border-b border-white/5 pb-10 gap-6">
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-[2px] h-8 bg-neon-yellow shadow-[0_0_15px_#D4FF00]" />
+            <h1 className="text-5xl font-black italic uppercase tracking-tighter leading-none">
+              STATUTORY <span className="text-neon-yellow">MASTER</span>
+            </h1>
+          </div>
+          <p className="text-[9px] font-mono text-gray-700 uppercase tracking-[0.5em] ml-4">
+            Legal Intelligence Repository // AI_ENABLED_V3
+          </p>
+        </div>
 
-      {/* Search Bar */}
-      <form className="relative max-w-2xl">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
-        <input
-          name="q"
-          defaultValue={query}
-          placeholder="Search by Act (e.g. IPC) or Section (e.g. 302)..."
-          className="w-full bg-[#0A0A0F] border border-gray-800 p-5 pl-14 text-white focus:border-electric-blue outline-none transition-all italic font-medium"
-        />
-        <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 bg-electric-blue text-white px-4 py-2 text-[10px] font-black uppercase">
-          Query
-        </button>
-      </form>
+        <div className="flex items-center gap-4 bg-white/[0.02] border border-white/5 px-6 py-4 rounded-sm">
+           <Cpu size={16} className="text-neon-yellow animate-pulse" />
+           <div className="text-right">
+              <p className="text-[8px] font-mono text-gray-600 uppercase tracking-widest text-gray-500">AI_Node</p>
+              <p className="text-xs font-black text-white italic leading-none uppercase tracking-tighter">Gemini_2.5_Flash</p>
+           </div>
+        </div>
+      </header>
 
-      {/* Results Grid */}
-      <div className="grid grid-cols-1 gap-4">
+      <SearchTerminal initialQuery={query} />
+
+      {/* RESULTS FEED */}
+      <div className="grid grid-cols-1 gap-px bg-white/5 border border-white/5 overflow-hidden">
         {records.length > 0 ? (
           records.map((item) => (
-            <div key={item.id} className="bg-[#0A0A0F] border border-gray-900 p-6 flex flex-col md:flex-row justify-between gap-6 hover:border-neon-yellow transition-colors group">
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <span className="bg-electric-blue/20 text-electric-blue px-2 py-1 text-[10px] font-black uppercase tracking-widest">
+            <div key={item.id} className="relative bg-[#020203] p-8 flex flex-col md:flex-row justify-between gap-8 hover:bg-white/[0.02] transition-all group border-b border-white/5 last:border-0">
+              <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-electric-blue opacity-0 group-hover:opacity-100 shadow-[0_0_15px_#00E0FF] transition-all" />
+              
+              <div className="space-y-4 max-w-4xl">
+                <div className="flex items-center gap-4">
+                  <span className="bg-electric-blue/10 text-electric-blue border border-electric-blue/20 px-3 py-1 text-[9px] font-black uppercase tracking-[0.2em]">
                     {item.actName}
                   </span>
-                  <h3 className="text-xl font-bold text-white italic group-hover:text-neon-yellow transition-colors">
-                    {item.section}
+                  <div className="h-[1px] w-8 bg-white/10" />
+                  <h3 className="text-2xl font-black text-white italic tracking-tighter group-hover:text-neon-yellow transition-colors leading-none">
+                    SECTION {item.section}
                   </h3>
                 </div>
-                <p className="text-gray-400 text-sm max-w-3xl leading-relaxed">
+                
+                <p className="text-gray-400 text-[11px] font-medium leading-relaxed uppercase tracking-tight group-hover:text-gray-200 transition-colors">
                   {item.description}
                 </p>
               </div>
               
-              <div className="flex flex-col justify-center items-end border-l border-gray-800 pl-6 min-w-[200px]">
-                <span className="text-[10px] text-gray-600 font-bold uppercase mb-1">Potential Penalty</span>
-                <span className="text-vibrant-pink font-black text-xs italic text-right uppercase">
-                  {item.penalty || "Refer to Counsel"}
+              <div className="flex flex-col justify-center items-end md:border-l border-white/5 md:pl-10 min-w-[240px]">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle size={12} className="text-vibrant-pink" />
+                  <span className="text-[9px] text-gray-700 font-black uppercase tracking-widest">Sanction_Protocol</span>
+                </div>
+                <span className="text-vibrant-pink font-black text-xs italic text-right uppercase bg-vibrant-pink/5 px-3 py-1 border border-vibrant-pink/10 shadow-[0_0_10px_rgba(255,0,212,0.1)]">
+                  {item.penalty || "REFER_TO_COUNSEL"}
                 </span>
               </div>
             </div>
           ))
         ) : (
-          <div className="py-20 text-center border-2 border-dashed border-gray-900 rounded-lg">
-            <Scale className="mx-auto text-gray-800 mb-4" size={48} />
-            <p className="text-gray-600 font-mono text-xs uppercase">No statutory records found for "{query}"</p>
+          <div className="py-32 text-center bg-[#020203]">
+            <Scale className="mx-auto text-gray-900 mb-6 opacity-20" size={64} />
+            <p className="text-gray-700 font-mono text-[10px] uppercase tracking-[0.6em] italic">
+              {query ? "DATA_REFINE_IN_PROGRESS" : "NO_RECORDS_INDEXED"}
+            </p>
           </div>
         )}
       </div>
